@@ -6,7 +6,11 @@ import { BedTile } from './components/bedTile';
 function App() {
   const [beds, setBeds] = useState<Bed[]>(mockBeds);
 
-  // Placeholder handlers (will implement later)
+  // Calculate statistics
+  const availableCount = beds.filter((b) => b.state === 'available').length;
+  const occupiedCount = beds.filter((b) => b.state === 'occupied').length;
+  const maintenanceCount = beds.filter((b) => b.state === 'maintenance').length;
+
   const handleAssign = (bed: Bed) => {
     console.log('Assign patient to:', bed.bed_number);
   };
@@ -31,6 +35,51 @@ function App() {
             <p className="text-gray-600 mt-2">
               Real-time bed tracking and patient management
             </p>
+          </div>
+        </div>
+
+        {/* Statistics */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="bg-green-50 border-2 border-green-200 rounded-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-green-600 text-sm font-semibold uppercase tracking-wide">
+                  Available
+                </p>
+                <p className="text-4xl font-bold text-green-700 mt-2">
+                  {availableCount}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-green-500 rounded-full"></div>
+            </div>
+          </div>
+
+          <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-red-600 text-sm font-semibold uppercase tracking-wide">
+                  Occupied
+                </p>
+                <p className="text-4xl font-bold text-red-700 mt-2">
+                  {occupiedCount}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-red-500 rounded-full"></div>
+            </div>
+          </div>
+
+          <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-yellow-600 text-sm font-semibold uppercase tracking-wide">
+                  Maintenance
+                </p>
+                <p className="text-4xl font-bold text-yellow-700 mt-2">
+                  {maintenanceCount}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-yellow-500 rounded-full"></div>
+            </div>
           </div>
         </div>
 
