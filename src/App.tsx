@@ -3,6 +3,7 @@ import { Bed, UrgencyLevel } from './types/bed';
 import { mockBeds } from './data/mockBeds';
 import { BedTile } from './components/bedTile';
 import { AssignPatientModal } from './components/AssignPatientModal';
+import { Toaster, toast } from 'sonner';
 
 function App() {
   const [beds, setBeds] = useState<Bed[]>(mockBeds);
@@ -39,7 +40,10 @@ function App() {
       )
     );
 
-    console.log('Patient assigned:', patientName, urgencyLevel);
+    // Show success toast
+    toast.success(`Patient assigned to ${selectedBed.bed_number}`, {
+      description: `${patientName} - ${urgencyLevel.toUpperCase()} urgency`,
+    });
   };
 
   // Handle discharge
@@ -56,7 +60,10 @@ function App() {
       )
     );
 
-    console.log('Patient discharged from:', bed.bed_number);
+    // Show success toast
+    toast.success(`Patient discharged from ${bed.bed_number}`, {
+      description: 'Bed moved to maintenance',
+    });
   };
 
   // Handle clean
@@ -76,7 +83,10 @@ function App() {
       )
     );
 
-    console.log('Bed cleaned:', bed.bed_number);
+    // Show success toast
+    toast.success(`${bed.bed_number} cleaned`, {
+      description: 'Bed is now available',
+    });
   };
 
   return (
@@ -160,6 +170,9 @@ function App() {
         onClose={() => setModalOpen(false)}
         onSubmit={handleAssignSubmit}
       />
+
+      {/* Sonner Toaster */}
+      <Toaster position="bottom-right" richColors />
     </div>
   );
 }
