@@ -1,40 +1,64 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Bed, UrgencyLevel } from './types/bed';
-import { mockBeds } from './data/mockBeds';
-import { BedTile } from './components/bedTile';
+import { bedApi } from './services/api';
+import { BedTile } from './components/BedTile';
 import { AssignPatientModal } from './components/AssignPatientModal';
 import { Button } from './components/ui/button';
 import { Toaster, toast } from 'sonner';
 import { Download, RefreshCw } from 'lucide-react';
+import { AxiosError } from 'axios';
 
 function App() {
-  const [beds, setBeds] = useState<Bed[]>(mockBeds);
+  const [beds, setBeds] = useState<Bed[]>([]);
   const [selectedBed, setSelectedBed] = useState<Bed | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   // Calculate statistics
   const availableCount = beds.filter((b) => b.state === 'available').length;
   const occupiedCount = beds.filter((b) => b.state === 'occupied').length;
   const maintenanceCount = beds.filter((b) => b.state === 'maintenance').length;
 
-  // Handle refresh
-  const handleRefresh = () => {
-    setLoading(true);
-    toast.loading('Refreshing bed data...');
-    
-    // Simulate API call
-    setTimeout(() => {
-      setBeds(mockBeds);
+  // Fetch beds from API
+  const fetchBeds = async () => {
+    try {
+      setLoading(true);
+      const data = await bedApi.getAllBeds();
+      setBeds(data);
+    } catch (error) {
+      console.error('Error fetching beds:', error);
+      toast.error('Failed to fetch bed data', {
+        description: 'Please check if the backend server is running',
+      });
+    } finally {
       setLoading(false);
-      toast.dismiss();
-      toast.success('Bed data refreshed');
-    }, 500);
+      setInitialLoading(false);
+    }
   };
 
-  // Handle export (placeholder)
+  // Fetch beds on mount
+  useEffect(() => {
+    fetchBeds();
+  }, []);
+
+  // Handle refresh
+  const handleRefresh = () => {
+    toast.promise(fetchBeds(), {
+      loading: 'Refreshing bed data...',
+      success: 'Bed data refreshed',
+      error: 'Failed to refresh data',
+    });
+  };
+
+  // Handle export
   const handleExport = () => {
-    toast.info('CSV export will be implemented with API');
+    try {
+      bedApi.exportCSV();
+      toast.success('CSV export started');
+    } catch (error) {
+      toast.error('Failed to export CSV');
+    }
   };
 
   // Handle assign - open modal
@@ -43,73 +67,97 @@ function App() {
     setModalOpen(true);
   };
 
-  // Handle assign submit - update bed state
-  const handleAssignSubmit = (patientName: string, urgencyLevel: UrgencyLevel) => {
+  // Handle assign submit - call API
+  const handleAssignSubmit = async (
+    patientName: string,
+    urgencyLevel: UrgencyLevel
+  ) => {
     if (!selectedBed) return;
 
-    // Update bed in state
-    setBeds((prevBeds) =>
-      prevBeds.map((bed) =>
-        bed.id === selectedBed.id
-          ? {
-              ...bed,
-              state: 'occupied' as const,
-              patient_name: patientName,
-              urgency_level: urgencyLevel,
-              assigned_at: new Date().toISOString(),
-            }
-          : bed
-      )
-    );
+    try {
+      const updatedBed = await bedApi.assignPatient(selectedBed.id, {
+        patient_name: patientName,
+        urgency_level: urgencyLevel,
+      });
 
-    // Show success toast
-    toast.success(`Patient assigned to ${selectedBed.bed_number}`, {
-      description: `${patientName} - ${urgencyLevel.toUpperCase()} urgency`,
-    });
+      // Update bed in local state
+      setBeds((prevBeds) =>
+        prevBeds.map((bed) => (bed.id === updatedBed.id ? updatedBed : bed))
+      );
+
+      toast.success(`Patient assigned to ${selectedBed.bed_number}`, {
+        description: `${patientName} - ${urgencyLevel.toUpperCase()} urgency`,
+      });
+    } catch (error) {
+      const axiosError = error as AxiosError<{ error: string }>;
+      const errorMessage =
+        axiosError.response?.data?.error || 'Failed to assign patient';
+      
+      toast.error('Assignment failed', {
+        description: errorMessage,
+      });
+    }
   };
 
-  // Handle discharge
-  const handleDischarge = (bed: Bed) => {
-    setBeds((prevBeds) =>
-      prevBeds.map((b) =>
-        b.id === bed.id
-          ? {
-              ...b,
-              state: 'maintenance' as const,
-              discharged_at: new Date().toISOString(),
-            }
-          : b
-      )
-    );
+  // Handle discharge - call API
+  const handleDischarge = async (bed: Bed) => {
+    try {
+      const updatedBed = await bedApi.dischargePatient(bed.id);
 
-    // Show success toast
-    toast.success(`Patient discharged from ${bed.bed_number}`, {
-      description: 'Bed moved to maintenance',
-    });
+      // Update bed in local state
+      setBeds((prevBeds) =>
+        prevBeds.map((b) => (b.id === updatedBed.id ? updatedBed : b))
+      );
+
+      toast.success(`Patient discharged from ${bed.bed_number}`, {
+        description: 'Bed moved to maintenance',
+      });
+    } catch (error) {
+      const axiosError = error as AxiosError<{ error: string }>;
+      const errorMessage =
+        axiosError.response?.data?.error || 'Failed to discharge patient';
+      
+      toast.error('Discharge failed', {
+        description: errorMessage,
+      });
+    }
   };
 
-  // Handle clean
-  const handleClean = (bed: Bed) => {
-    setBeds((prevBeds) =>
-      prevBeds.map((b) =>
-        b.id === bed.id
-          ? {
-              ...b,
-              state: 'available' as const,
-              patient_name: null,
-              urgency_level: null,
-              assigned_at: null,
-              discharged_at: null,
-            }
-          : b
-      )
-    );
+  // Handle clean - call API
+  const handleClean = async (bed: Bed) => {
+    try {
+      const updatedBed = await bedApi.cleanBed(bed.id);
 
-    // Show success toast
-    toast.success(`${bed.bed_number} cleaned`, {
-      description: 'Bed is now available',
-    });
+      // Update bed in local state
+      setBeds((prevBeds) =>
+        prevBeds.map((b) => (b.id === updatedBed.id ? updatedBed : b))
+      );
+
+      toast.success(`${bed.bed_number} cleaned`, {
+        description: 'Bed is now available',
+      });
+    } catch (error) {
+      const axiosError = error as AxiosError<{ error: string }>;
+      const errorMessage =
+        axiosError.response?.data?.error || 'Failed to clean bed';
+      
+      toast.error('Cleaning failed', {
+        description: errorMessage,
+      });
+    }
   };
+
+  // Initial loading state
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="w-12 h-12 animate-spin text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">Loading bed data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8">
@@ -193,6 +241,10 @@ function App() {
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
+          </div>
+        ) : beds.length === 0 ? (
+          <div className="flex items-center justify-center h-64">
+            <p className="text-gray-500">No beds found. Please check the backend.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
