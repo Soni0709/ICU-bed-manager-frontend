@@ -1,26 +1,82 @@
 import { useState } from 'react';
-import { Bed } from './types/bed';
+import { Bed, UrgencyLevel } from './types/bed';
 import { mockBeds } from './data/mockBeds';
 import { BedTile } from './components/bedTile';
+import { AssignPatientModal } from './components/AssignPatientModal';
 
 function App() {
   const [beds, setBeds] = useState<Bed[]>(mockBeds);
+  const [selectedBed, setSelectedBed] = useState<Bed | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   // Calculate statistics
   const availableCount = beds.filter((b) => b.state === 'available').length;
   const occupiedCount = beds.filter((b) => b.state === 'occupied').length;
   const maintenanceCount = beds.filter((b) => b.state === 'maintenance').length;
 
+  // Handle assign - open modal
   const handleAssign = (bed: Bed) => {
-    console.log('Assign patient to:', bed.bed_number);
+    setSelectedBed(bed);
+    setModalOpen(true);
   };
 
+  // Handle assign submit - update bed state
+  const handleAssignSubmit = (patientName: string, urgencyLevel: UrgencyLevel) => {
+    if (!selectedBed) return;
+
+    // Update bed in state
+    setBeds((prevBeds) =>
+      prevBeds.map((bed) =>
+        bed.id === selectedBed.id
+          ? {
+              ...bed,
+              state: 'occupied' as const,
+              patient_name: patientName,
+              urgency_level: urgencyLevel,
+              assigned_at: new Date().toISOString(),
+            }
+          : bed
+      )
+    );
+
+    console.log('Patient assigned:', patientName, urgencyLevel);
+  };
+
+  // Handle discharge
   const handleDischarge = (bed: Bed) => {
-    console.log('Discharge patient from:', bed.bed_number);
+    setBeds((prevBeds) =>
+      prevBeds.map((b) =>
+        b.id === bed.id
+          ? {
+              ...b,
+              state: 'maintenance' as const,
+              discharged_at: new Date().toISOString(),
+            }
+          : b
+      )
+    );
+
+    console.log('Patient discharged from:', bed.bed_number);
   };
 
+  // Handle clean
   const handleClean = (bed: Bed) => {
-    console.log('Clean bed:', bed.bed_number);
+    setBeds((prevBeds) =>
+      prevBeds.map((b) =>
+        b.id === bed.id
+          ? {
+              ...b,
+              state: 'available' as const,
+              patient_name: null,
+              urgency_level: null,
+              assigned_at: null,
+              discharged_at: null,
+            }
+          : b
+      )
+    );
+
+    console.log('Bed cleaned:', bed.bed_number);
   };
 
   return (
@@ -96,6 +152,14 @@ function App() {
           ))}
         </div>
       </div>
+
+      {/* Assign Patient Modal */}
+      <AssignPatientModal
+        bed={selectedBed}
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSubmit={handleAssignSubmit}
+      />
     </div>
   );
 }
