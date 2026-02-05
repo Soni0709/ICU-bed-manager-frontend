@@ -16,3 +16,12 @@ export interface Bed {
   created_at: string;
   updated_at: string;
 }
+
+export interface AssignPatientRequest {
+  patient_name: string;
+  urgency_level: UrgencyLevel;
+}
+
+export interface ApiErrorResponse {
+  error: string;
+}
